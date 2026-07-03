@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="004-create-transactions" author="yowyob">
+        <sql>
+            CREATE TABLE "yy-pay-transactions" (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                wallet_id UUID REFERENCES "yy-pay-wallets"(id),
+                user_id UUID REFERENCES "yy-pay-users"(id),
+                amount DECIMAL(19,4) NOT NULL,
+                type VARCHAR(32) NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
+                reference VARCHAR(255) NOT NULL UNIQUE,
+                fees DECIMAL(19,4) NOT NULL DEFAULT 0.0,
+                method VARCHAR(32) NOT NULL,
+                stripe_session_id VARCHAR(512),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            CREATE INDEX idx_yy_pay_tx_wallet_id ON "yy-pay-transactions"(wallet_id);
+            CREATE INDEX idx_yy_pay_tx_user_id ON "yy-pay-transactions"(user_id);
+            CREATE INDEX idx_yy_pay_tx_amount ON "yy-pay-transactions"(amount);
+            CREATE INDEX idx_yy_pay_tx_type ON "yy-pay-transactions"(type);
+            CREATE INDEX idx_yy_pay_tx_status ON "yy-pay-transactions"(status);
+            CREATE INDEX idx_yy_pay_tx_reference ON "yy-pay-transactions"(reference);
+            CREATE INDEX idx_yy_pay_tx_method ON "yy-pay-transactions"(method);
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

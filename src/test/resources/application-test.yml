@@ -1,0 +1,60 @@
+server:
+  port: 0
+
+spring:
+  application:
+    name: yowyob-payment-test
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/yowyob_payment_test
+    username: yowyob
+    password: secret
+    pool:
+      enabled: true
+      initial-size: 1
+      max-size: 2
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: test-group
+
+yowyob:
+  jwt:
+    secret: B7lNty52nURS1lCg6KjEvPh6e71c/ndOh1H4mCMRMgo=
+    expiration-ms: 3600000
+  admin:
+    email: admin@test.local
+    password: admin
+    name: Admin
+  redis:
+    ttl-seconds: 60
+  fees:
+    enabled: true
+    type: PERCENTAGE
+    value: 0.02
+    currency: XAF
+  transaction:
+    reference-prefix: TXN
+    min-amount: 100
+    max-amount: 10000000
+    max-wallet-balance: 50000000
+  kafka:
+    topic-transaction-events: test.transaction.events
+    topic-wallet-events: test.wallet.events
+    topic-wallet-create: wallet-create-topic
+    consumer:
+      enabled: false
+  stripe:
+    secret-key: sk_test_placeholder
+    webhook-secret: whsec_placeholder
+    success-url: http://localhost:8080/success
+    cancel-url: http://localhost:8080/cancel
+    currency: eur
+  swagger:
+    title: Test API
+    description: Test
+    version: 1.0.0
+    server-url: http://localhost:8080

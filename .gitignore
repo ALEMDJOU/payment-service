@@ -1,0 +1,107 @@
+# =============================================================================
+# Yowyob Payment - .gitignore
+# Conserve uniquement ce qui est nécessaire au build et au lancement :
+#   pom.xml, Dockerfile, src/, docker/docker-compose.yml,
+#   docker/.env.example, docker/liquibase/
+# =============================================================================
+
+# ── Maven / Java (artefacts de build) ────────────────────────────────────────
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# ── Variables d'environnement et secrets ─────────────────────────────────────
+.env
+.env.*
+!.env.example
+docker/.env
+docker/.env.*
+!docker/.env.example
+*.pem
+*.key
+*.p12
+*.jks
+credentials.json
+secrets.yml
+secrets.yaml
+
+# ── Docker : skills IA / outils dev (non requis au runtime) ──────────────────
+docker/.*/
+docker/skills-lock.json
+
+# ── IDE - IntelliJ IDEA ──────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# ── IDE - Eclipse / STS ──────────────────────────────────────────────────────
+.classpath
+.project
+.settings/
+bin/
+.factorypath
+.springBeans
+.sts4-cache
+
+# ── IDE - VS Code / Cursor ───────────────────────────────────────────────────
+.vscode/
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.cursor/
+
+# ── IDE - NetBeans ───────────────────────────────────────────────────────────
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# ── Logs et rapports de tests ────────────────────────────────────────────────
+*.log
+logs/
+surefire-reports/
+test-output/
+jacoco.exec
+*.exec
+coverage/
+.site/
+
+# ── Système d'exploitation ───────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ── Éditeurs et fichiers temporaires ─────────────────────────────────────────
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
+.#*
+
+# ── Données locales Docker (si montées hors volumes nommés) ───────────────────
+docker/pgdata/
+docker/data/

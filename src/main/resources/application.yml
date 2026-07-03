@@ -1,0 +1,90 @@
+server:
+  port: ${APP_PORT}
+  forward-headers-strategy: framework
+
+spring:
+  application:
+    name: ${APP_NAME}
+  r2dbc:
+    url: r2dbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    pool:
+      enabled: true
+      initial-size: ${DB_POOL_MIN}
+      max-size: ${DB_POOL_MAX}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      repositories:
+        enabled: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: ${KAFKA_GROUP_ID}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+yowyob:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS}
+  admin:
+    email: ${ADMIN_EMAIL}
+    password: ${ADMIN_PASSWORD}
+    name: ${ADMIN_NAME}
+  redis:
+    ttl-seconds: ${REDIS_TTL_SECONDS}
+  fees:
+    enabled: ${WITH_FEES}
+    type: ${FEE_TYPE}
+    value: ${FEE_VALUE}
+    currency: ${FEE_CURRENCY}
+  transaction:
+    reference-prefix: ${TRANSACTION_REFERENCE_PREFIX}
+    min-amount: ${MIN_TRANSACTION_AMOUNT}
+    max-amount: ${MAX_TRANSACTION_AMOUNT}
+    max-wallet-balance: ${MAX_WALLET_BALANCE}
+  kafka:
+    topic-transaction-events: ${KAFKA_TOPIC_TRANSACTION_EVENTS}
+    topic-wallet-events: ${KAFKA_TOPIC_WALLET_EVENTS}
+    topic-wallet-create: ${KAFKA_TOPIC_WALLET_CREATE}
+    consumer:
+      enabled: true
+  stripe:
+    secret-key: ${STRIPE_SECRET_KEY}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+    success-url: ${STRIPE_SUCCESS_URL}
+    cancel-url: ${STRIPE_CANCEL_URL}
+    currency: ${STRIPE_CURRENCY}
+  swagger:
+    title: ${SWAGGER_TITLE}
+    description: ${SWAGGER_DESCRIPTION}
+    version: ${SWAGGER_VERSION}
+    server-url: ${SWAGGER_SERVER_URL}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.yowyob.payment: INFO
