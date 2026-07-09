@@ -3,12 +3,13 @@
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
 
-    <changeSet id="004-create-transactions" author="yowyob">
+    <changeSet id="002-create-transactions" author="yowyob">
         <sql>
             CREATE TABLE "yy-pay-transactions" (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 wallet_id UUID REFERENCES "yy-pay-wallets"(id),
-                user_id UUID REFERENCES "yy-pay-users"(id),
+                user_id UUID,
+                organization_id UUID NOT NULL,
                 amount DECIMAL(19,4) NOT NULL,
                 type VARCHAR(32) NOT NULL,
                 status VARCHAR(32) NOT NULL DEFAULT 'CREATED',
@@ -21,6 +22,7 @@
             );
             CREATE INDEX idx_yy_pay_tx_wallet_id ON "yy-pay-transactions"(wallet_id);
             CREATE INDEX idx_yy_pay_tx_user_id ON "yy-pay-transactions"(user_id);
+            CREATE INDEX idx_yy_pay_tx_organization_id ON "yy-pay-transactions"(organization_id);
             CREATE INDEX idx_yy_pay_tx_amount ON "yy-pay-transactions"(amount);
             CREATE INDEX idx_yy_pay_tx_type ON "yy-pay-transactions"(type);
             CREATE INDEX idx_yy_pay_tx_status ON "yy-pay-transactions"(status);
