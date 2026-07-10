@@ -1,15 +1,14 @@
 package com.yowyob.payment.infrastructure.security;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 
-import com.yowyob.payment.domain.user.UserRole;
-
 import reactor.core.publisher.Mono;
 
 /**
- * Utilitaires d'accès au principal authentifié.
+ * Utilitaires d'accès au principal kernel authentifié.
  */
 public final class SecurityUtils {
 
@@ -19,22 +18,43 @@ public final class SecurityUtils {
     /**
      * @return principal courant
      */
-    public static Mono<AuthPrincipal> currentPrincipal() {
+    public static Mono<KernelPrincipal> currentPrincipal() {
         return ReactiveSecurityContextHolder.getContext()
-                .map(ctx -> (AuthPrincipal) ctx.getAuthentication().getPrincipal());
+                .map(ctx -> (KernelPrincipal) ctx.getAuthentication().getPrincipal());
     }
 
     /**
-     * @return identifiant utilisateur courant
+     * @return identifiant utilisateur courant (claim sub)
      */
     public static Mono<UUID> currentUserId() {
-        return currentPrincipal().map(AuthPrincipal::getId);
+        return currentPrincipal().map(KernelPrincipal::getUserId);
     }
 
     /**
-     * @return true si ADMIN
+     * @return identifiant organisation courant (claim oid)
+     */
+    public static Mono<UUID> currentOrganizationId() {
+        return currentPrincipal().map(KernelPrincipal::getOrganizationId);
+    }
+
+    /**
+     * @return identifiant tenant courant (claim tid)
+     */
+    public static Mono<String> currentTenantId() {
+        return currentPrincipal().map(KernelPrincipal::getTenantId);
+    }
+
+    /**
+     * @return permissions kernel
+     */
+    public static Mono<List<String>> permissions() {
+        return currentPrincipal().map(KernelPrincipal::getPermissions);
+    }
+
+    /**
+     * @return true si permission admin kernel
      */
     public static Mono<Boolean> isAdmin() {
-        return currentPrincipal().map(p -> p.getRole() == UserRole.ADMIN);
+        return currentPrincipal().map(KernelPrincipal::isAdmin);
     }
 }

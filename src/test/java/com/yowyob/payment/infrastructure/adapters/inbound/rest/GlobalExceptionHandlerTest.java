@@ -12,7 +12,7 @@ import org.springframework.web.bind.support.WebExchangeBindException;
 
 import com.yowyob.payment.domain.exception.UnsupportedPaymentMethodException;
 import com.yowyob.payment.domain.transaction.PaymentMethod;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletTransactionRequest;
+import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.TransactionRequest;
 
 import reactor.test.StepVerifier;
 
@@ -43,13 +43,13 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void shouldReturnFieldErrorsForValidationFailure() throws NoSuchMethodException {
-        WalletTransactionRequest target = new WalletTransactionRequest(null, null, PaymentMethod.WALLET);
+        TransactionRequest target = new TransactionRequest(null, null, null, PaymentMethod.WALLET, null, null);
         BeanPropertyBindingResult bindingResult = new BeanPropertyBindingResult(target, "request");
         bindingResult.addError(new FieldError("request", "amount", "must be greater than 0"));
         bindingResult.addError(new FieldError("request", "walletId", "must not be null"));
 
         MethodParameter parameter = new MethodParameter(
-                GlobalExceptionHandlerTest.class.getDeclaredMethod("dummy", WalletTransactionRequest.class), 0);
+                GlobalExceptionHandlerTest.class.getDeclaredMethod("dummy", TransactionRequest.class), 0);
         WebExchangeBindException exception = new WebExchangeBindException(parameter, bindingResult);
 
         StepVerifier.create(handler.handleValidation(exception))
@@ -64,7 +64,7 @@ class GlobalExceptionHandlerTest {
     }
 
     @SuppressWarnings("unused")
-    private void dummy(WalletTransactionRequest request) {
+    private void dummy(TransactionRequest request) {
         // Paramètre cible pour MethodParameter
     }
 }

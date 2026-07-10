@@ -41,13 +41,18 @@ public class WalletR2dbcAdapter implements WalletRepositoryPort {
     }
 
     @Override
+    public Mono<Wallet> findByUserIdAndOrganizationId(UUID userId, UUID organizationId) {
+        return repository.findByUserIdAndOrganizationId(userId, organizationId).map(PersistenceMapper::toDomain);
+    }
+
+    @Override
     public Flux<Wallet> findByUserId(UUID userId) {
         return repository.findByUserId(userId).map(PersistenceMapper::toDomain);
     }
 
     @Override
-    public Mono<Wallet> findFirstByUserId(UUID userId) {
-        return repository.findFirstByUserId(userId).map(PersistenceMapper::toDomain);
+    public Flux<Wallet> findByUserIdAndOrganizationIdFilter(UUID userId, UUID organizationId) {
+        return repository.findAllByUserIdAndOrganizationId(userId, organizationId).map(PersistenceMapper::toDomain);
     }
 
     @Override
@@ -58,11 +63,6 @@ public class WalletR2dbcAdapter implements WalletRepositoryPort {
     @Override
     public Mono<Wallet> update(Wallet wallet) {
         return repository.save(PersistenceMapper.toEntity(wallet)).map(PersistenceMapper::toDomain);
-    }
-
-    @Override
-    public Mono<Void> deleteById(UUID id) {
-        return repository.deleteById(id);
     }
 
     @Override
@@ -81,7 +81,7 @@ public class WalletR2dbcAdapter implements WalletRepositoryPort {
                         UPDATE "yy-pay-wallets"
                         SET balance = balance + :delta, updated_at = :now
                         WHERE id = :id AND balance + :delta >= 0
-                        RETURNING id, user_id, balance, status, created_at, updated_at
+                        RETURNING id, user_id, organization_id, balance, status, created_at, updated_at
                         """)
                 .bind("delta", delta)
                 .bind("now", Instant.now())
@@ -89,6 +89,7 @@ public class WalletR2dbcAdapter implements WalletRepositoryPort {
                 .map((row, metadata) -> new Wallet(
                         row.get("id", UUID.class),
                         row.get("user_id", UUID.class),
+                        row.get("organization_id", UUID.class),
                         row.get("balance", BigDecimal.class),
                         com.yowyob.payment.domain.wallet.WalletStatus.valueOf(row.get("status", String.class)),
                         row.get("created_at", Instant.class),

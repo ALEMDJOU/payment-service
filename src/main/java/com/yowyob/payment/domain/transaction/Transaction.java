@@ -2,6 +2,7 @@ package com.yowyob.payment.domain.transaction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -11,6 +12,7 @@ public record Transaction(
         UUID id,
         UUID walletId,
         UUID userId,
+        UUID organizationId,
         BigDecimal amount,
         TransactionType type,
         TransactionStatus status,
@@ -18,6 +20,8 @@ public record Transaction(
         BigDecimal fees,
         PaymentMethod method,
         String stripeSessionId,
+        String callbackUrl,
+        Map<String, String> metadata,
         Instant createdAt,
         Instant updatedAt) {
 
@@ -26,8 +30,8 @@ public record Transaction(
      * @return transaction avec statut mis à jour
      */
     public Transaction withStatus(TransactionStatus newStatus) {
-        return new Transaction(id, walletId, userId, amount, type, newStatus, reference, fees, method,
-                stripeSessionId, createdAt, Instant.now());
+        return new Transaction(id, walletId, userId, organizationId, amount, type, newStatus, reference, fees, method,
+                stripeSessionId, callbackUrl, metadata, createdAt, Instant.now());
     }
 
     /**
@@ -35,7 +39,7 @@ public record Transaction(
      * @return transaction avec session Stripe
      */
     public Transaction withStripeSessionId(String sessionId) {
-        return new Transaction(id, walletId, userId, amount, type, status, reference, fees, method,
-                sessionId, createdAt, Instant.now());
+        return new Transaction(id, walletId, userId, organizationId, amount, type, status, reference, fees, method,
+                sessionId, callbackUrl, metadata, createdAt, Instant.now());
     }
 }

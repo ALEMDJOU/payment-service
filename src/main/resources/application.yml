@@ -33,13 +33,15 @@ spring:
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 yowyob:
-  jwt:
-    secret: ${JWT_SECRET}
-    expiration-ms: ${JWT_EXPIRATION_MS}
-  admin:
-    email: ${ADMIN_EMAIL}
-    password: ${ADMIN_PASSWORD}
-    name: ${ADMIN_NAME}
+  kernel:
+    base-url: ${KERNEL_BASE_URL:https://kernel-core.yowyob.com}
+    client-id: ${KERNEL_CLIENT_ID}
+    api-key: ${KERNEL_API_KEY}
+    tenant-id: ${KERNEL_TENANT_ID}
+    jwks-uri: ${KERNEL_BASE_URL:https://kernel-core.yowyob.com}/.well-known/jwks.json
+    issuer: ${KERNEL_ISSUER:${KERNEL_BASE_URL:https://kernel-core.yowyob.com}}
+    permissions:
+      admin: ${PAYMENTS_ADMIN_PERMISSIONS:payments:admin}
   redis:
     ttl-seconds: ${REDIS_TTL_SECONDS}
   fees:
@@ -55,15 +57,19 @@ yowyob:
   kafka:
     topic-transaction-events: ${KAFKA_TOPIC_TRANSACTION_EVENTS}
     topic-wallet-events: ${KAFKA_TOPIC_WALLET_EVENTS}
-    topic-wallet-create: ${KAFKA_TOPIC_WALLET_CREATE}
-    consumer:
-      enabled: true
   stripe:
     secret-key: ${STRIPE_SECRET_KEY}
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     success-url: ${STRIPE_SUCCESS_URL}
     cancel-url: ${STRIPE_CANCEL_URL}
     currency: ${STRIPE_CURRENCY}
+  webhook:
+    max-attempts: ${WEBHOOK_MAX_ATTEMPTS:5}
+    initial-delay-ms: ${WEBHOOK_INITIAL_DELAY_MS:1000}
+    multiplier: ${WEBHOOK_RETRY_MULTIPLIER:2}
+    poll-interval-ms: ${WEBHOOK_POLL_INTERVAL_MS:5000}
+    timeout-ms: ${WEBHOOK_TIMEOUT_MS:10000}
+    batch-size: ${WEBHOOK_BATCH_SIZE:20}
   swagger:
     title: ${SWAGGER_TITLE}
     description: ${SWAGGER_DESCRIPTION}

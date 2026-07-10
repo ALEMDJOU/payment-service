@@ -45,4 +45,11 @@ public interface TransactionRepositoryPort {
      * @return transactions de l'utilisateur
      */
     Flux<Transaction> findByUserId(UUID userId);
+
+    /**
+     * @param userId         utilisateur
+     * @param organizationId organisation
+     * @return transactions filtrées
+     */
+    Flux<Transaction> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);
 }

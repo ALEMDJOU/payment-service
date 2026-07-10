@@ -27,6 +27,8 @@ public class WalletEntity extends AbstractPersistableEntity<UUID> {
     private UUID id;
     @Column("user_id")
     private UUID userId;
+    @Column("organization_id")
+    private UUID organizationId;
     private BigDecimal balance;
     private WalletStatus status;
     @Column("created_at")

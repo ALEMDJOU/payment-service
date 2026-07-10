@@ -31,4 +31,11 @@ public interface TransactionR2dbcRepository extends ReactiveCrudRepository<Trans
      * @return transactions
      */
     Flux<TransactionEntity> findByUserId(UUID userId);
+
+    /**
+     * @param userId         utilisateur
+     * @param organizationId organisation
+     * @return transactions filtrées
+     */
+    Flux<TransactionEntity> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);
 }

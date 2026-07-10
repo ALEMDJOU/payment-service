@@ -21,8 +21,16 @@ public interface WalletR2dbcRepository extends ReactiveCrudRepository<WalletEnti
     Flux<WalletEntity> findByUserId(UUID userId);
 
     /**
-     * @param userId propriétaire
-     * @return premier portefeuille
+     * @param userId         propriétaire
+     * @param organizationId organisation
+     * @return portefeuille
      */
-    Mono<WalletEntity> findFirstByUserId(UUID userId);
+    Mono<WalletEntity> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);
+
+    /**
+     * @param userId         propriétaire
+     * @param organizationId organisation
+     * @return portefeuilles filtrés
+     */
+    Flux<WalletEntity> findAllByUserIdAndOrganizationId(UUID userId, UUID organizationId);
 }

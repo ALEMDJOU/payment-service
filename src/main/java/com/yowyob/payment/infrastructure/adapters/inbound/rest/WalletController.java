@@ -3,9 +3,7 @@ package com.yowyob.payment.infrastructure.adapters.inbound.rest;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,12 +12,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.yowyob.payment.application.WalletService;
-import com.yowyob.payment.domain.wallet.WalletStatus;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.MessageResponse;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.UpdateWalletStatusRequest;
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletBalanceResponse;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletCanOperateResponse;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletRequest;
+import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletCreateRequest;
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletResponse;
 import com.yowyob.payment.infrastructure.security.SecurityUtils;
 
@@ -30,16 +24,24 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * API portefeuilles (hey.json + extensions).
+ * API portefeuilles (kernel sub + oid).
  */
-@Tag(name = "Wallet Management", description = "API for wallet management")
-@SecurityRequirement(name = "bearerAuth")
+@Tag(name = "Wallets", description = """
+        Cycle de vie des portefeuilles utilisateur.
+        **Parcours** : 1) Auth kernel → 2) `GET /wallets/me` (création lazy) → 3) transactions.
+        Headers requis : Authorization Bearer + X-Client-Id + X-Api-Key + X-Tenant-Id + X-Organization-Id.
+        Guide complet : [/docs/guide.md](/docs/guide.md)
+        """)
+@SecurityRequirement(name = "kernelBearer")
+@SecurityRequirement(name = "kernelClientId")
+@SecurityRequirement(name = "kernelApiKey")
+@SecurityRequirement(name = "kernelTenantId")
+@SecurityRequirement(name = "kernelOrganizationId")
 @RestController
 @RequestMapping("/api/v1/wallets")
 @RequiredArgsConstructor
@@ -49,38 +51,43 @@ public class WalletController {
         private final WalletService walletService;
 
         /**
-         * @param request création
-         * @return wallet créé
+         * @return wallet du couple (sub, oid) courant ; création lazy si absent
          */
-        @PostMapping
-        @ResponseStatus(HttpStatus.CREATED)
-        @Operation(summary = "Create a new wallet", description = "Creates a new wallet for a user.")
-        @ApiResponse(responseCode = "201", description = "Portefeuille créé", content = @Content(schema = @Schema(implementation = WalletResponse.class)))
-        public Mono<WalletResponse> create(@Valid @RequestBody WalletRequest request) {
-                return SecurityUtils.isAdmin()
-                                .flatMap(isAdmin -> {
-                                        if (isAdmin) {
-                                                return walletService.createWallet(request.ownerId());
-                                        }
-                                        return SecurityUtils.currentUserId()
-                                                        .flatMap(userId -> walletService.createWallet(userId));
-                                })
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
+        @GetMapping("/me")
+        @Operation(summary = "Mon portefeuille courant", description = """
+                Retourne le portefeuille du couple (sub, oid) issu du JWT et du header X-Organization-Id.
+                **Crée automatiquement** le portefeuille s'il n'existe pas encore (lazy create).
+                """)
+        @ApiResponse(responseCode = "200", description = "Portefeuille trouvé ou créé",
+                content = @Content(schema = @Schema(implementation = WalletResponse.class)))
+        public Mono<WalletResponse> getMine() {
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .flatMap(t -> walletService.getOrCreate(t.getT1(), t.getT2()))
+                                .map(WalletResponse::from);
         }
 
         /**
-         * @return liste des wallets
+         * @return liste des wallets du sub (filtré par oid si header présent)
          */
         @GetMapping
-        @Operation(summary = "Get all wallets", description = "Retrieves wallets (scoped to user unless admin).")
-        @ApiResponse(responseCode = "200", description = "Liste des portefeuilles", content = @Content(array = @ArraySchema(schema = @Schema(implementation = WalletResponse.class))))
+        @Operation(summary = "Lister mes portefeuilles", description = """
+                Liste les portefeuilles de l'utilisateur connecté (claim sub).
+                Filtrés par organisation courante (claim oid) sauf pour les admins.
+                """)
+        @ApiResponse(responseCode = "200", description = "Liste des portefeuilles",
+                content = @Content(array = @ArraySchema(schema = @Schema(implementation = WalletResponse.class))))
         public Flux<WalletResponse> getAll() {
                 return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
                                 .zipWith(SecurityUtils.isAdmin())
-                                .flatMapMany(tuple -> walletService.findAll(tuple.getT1(), tuple.getT2()))
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
+                                .flatMapMany(tuple -> {
+                                        UUID userId = tuple.getT1().getT1();
+                                        UUID orgId = tuple.getT1().getT2();
+                                        boolean isAdmin = tuple.getT2();
+                                        return walletService.findAll(userId, isAdmin ? null : orgId, isAdmin);
+                                })
+                                .map(WalletResponse::from);
         }
 
         /**
@@ -88,8 +95,9 @@ public class WalletController {
          * @return wallet
          */
         @GetMapping("/{id}")
-        @Operation(summary = "Get wallet by ID")
-        @ApiResponse(responseCode = "200", description = "Portefeuille trouvé", content = @Content(schema = @Schema(implementation = WalletResponse.class)))
+        @Operation(summary = "Détail portefeuille", description = "Retourne un portefeuille après vérification d'accès (sub + oid).")
+        @ApiResponse(responseCode = "200", description = "Portefeuille trouvé",
+                content = @Content(schema = @Schema(implementation = WalletResponse.class)))
         public Mono<WalletResponse> getById(@PathVariable UUID id) {
                 return authorizeAndMap(id);
         }
@@ -99,83 +107,54 @@ public class WalletController {
          * @return solde
          */
         @GetMapping("/{id}/balance")
-        @Operation(summary = "Get wallet balance")
-        @ApiResponse(responseCode = "200", description = "Solde du portefeuille", content = @Content(schema = @Schema(implementation = WalletBalanceResponse.class)))
+        @Operation(summary = "Solde portefeuille", description = "Retourne le solde après vérification d'accès.")
+        @ApiResponse(responseCode = "200", description = "Solde du portefeuille",
+                content = @Content(schema = @Schema(implementation = WalletBalanceResponse.class)))
         public Mono<WalletBalanceResponse> getBalance(@PathVariable UUID id) {
-                return SecurityUtils.currentUserId().zipWith(SecurityUtils.isAdmin())
-                                .flatMap(t -> walletService.authorizeAccess(id, t.getT1(), t.getT2()))
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMap(t -> walletService.authorizeAccess(id, t.getT1().getT1(),
+                                                t.getT1().getT2(), t.getT2()))
                                 .flatMap(w -> walletService.getBalance(id).map(WalletBalanceResponse::new));
         }
 
         /**
-         * @param id identifiant
-         * @return true si opération possible
+         * @param request création (admin peut spécifier userId + organizationId)
+         * @return wallet créé ou existant
          */
-        @GetMapping("/{id}/can-operate")
-        @Operation(summary = "Check if wallet can operate")
-        @ApiResponse(responseCode = "200", description = "Capacité opérationnelle", content = @Content(schema = @Schema(implementation = WalletCanOperateResponse.class)))
-        public Mono<WalletCanOperateResponse> canOperate(@PathVariable UUID id) {
-                return walletService.canOperate(id).map(WalletCanOperateResponse::new);
-        }
-
-        /**
-         * @param ownerId propriétaire
-         * @return wallet
-         */
-        @GetMapping("/owner/{id}")
-        @Operation(summary = "Get wallet by owner ID")
-        @ApiResponse(responseCode = "200", description = "Portefeuille du propriétaire", content = @Content(schema = @Schema(implementation = WalletResponse.class)))
-        public Mono<WalletResponse> getByOwner(@PathVariable("id") UUID ownerId) {
-                return walletService.findByOwnerId(ownerId)
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
-        }
-
-        /**
-         * @param id      identifiant
-         * @param request mise à jour
-         * @return wallet
-         */
-        @PatchMapping("/{id}")
-        @Operation(summary = "Update a wallet")
-        @ApiResponse(responseCode = "200", description = "Portefeuille mis à jour", content = @Content(schema = @Schema(implementation = WalletResponse.class)))
-        public Mono<WalletResponse> update(@PathVariable UUID id, @Valid @RequestBody WalletRequest request) {
-                return walletService.updateWallet(id, request.ownerId())
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
-        }
-
-        /**
-         * @param id      identifiant
-         * @param request nouveau statut
-         * @return wallet
-         */
-        @PatchMapping("/{id}/status")
-        @Operation(summary = "Update wallet status")
-        @ApiResponse(responseCode = "200", description = "Statut mis à jour", content = @Content(schema = @Schema(implementation = WalletResponse.class)))
-        public Mono<WalletResponse> updateStatus(@PathVariable UUID id,
-                        @Valid @RequestBody UpdateWalletStatusRequest request) {
-                return walletService.updateStatus(id, WalletStatus.valueOf(request.status()))
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
-        }
-
-        /**
-         * @param id identifiant
-         * @return confirmation
-         */
-        @DeleteMapping("/{id}")
-        @Operation(summary = "Delete a wallet")
-        @ApiResponse(responseCode = "200", description = "Portefeuille supprimé", content = @Content(schema = @Schema(implementation = MessageResponse.class)))
-        public Mono<MessageResponse> delete(@PathVariable UUID id) {
-                return walletService.deleteWallet(id)
-                                .thenReturn(new MessageResponse("Portefeuille supprimé avec succès"));
+        @PostMapping
+        @ResponseStatus(HttpStatus.CREATED)
+        @Operation(summary = "Créer un portefeuille", description = """
+                Crée un portefeuille pour le couple (sub, oid) courant.
+                Admin : peut spécifier `userId` et `organizationId` dans le body.
+                Retourne le portefeuille existant s'il existe déjà (idempotent).
+                """)
+        @ApiResponse(responseCode = "201", description = "Portefeuille créé",
+                content = @Content(schema = @Schema(implementation = WalletResponse.class)))
+        public Mono<WalletResponse> create(@RequestBody(required = false) WalletCreateRequest request) {
+                WalletCreateRequest body = request != null ? request : new WalletCreateRequest(null, null);
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMap(t -> {
+                                        UUID userId = body.userId() != null && t.getT2()
+                                                        ? body.userId()
+                                                        : t.getT1().getT1();
+                                        UUID orgId = body.organizationId() != null && t.getT2()
+                                                        ? body.organizationId()
+                                                        : t.getT1().getT2();
+                                        return walletService.getOrCreate(userId, orgId);
+                                })
+                                .map(WalletResponse::from);
         }
 
         private Mono<WalletResponse> authorizeAndMap(UUID id) {
-                return SecurityUtils.currentUserId().zipWith(SecurityUtils.isAdmin())
-                                .flatMap(t -> walletService.authorizeAccess(id, t.getT1(), t.getT2()))
-                                .flatMap(wallet -> walletService.resolveOwnerName(wallet)
-                                                .map(name -> WalletResponse.from(wallet, name)));
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMap(t -> walletService.authorizeAccess(id, t.getT1().getT1(),
+                                                t.getT1().getT2(), t.getT2()))
+                                .map(WalletResponse::from);
         }
 }

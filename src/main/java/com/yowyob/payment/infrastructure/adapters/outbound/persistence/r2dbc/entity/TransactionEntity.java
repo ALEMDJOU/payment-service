@@ -31,6 +31,8 @@ public class TransactionEntity extends AbstractPersistableEntity<UUID> {
     private UUID walletId;
     @Column("user_id")
     private UUID userId;
+    @Column("organization_id")
+    private UUID organizationId;
     private BigDecimal amount;
     private TransactionType type;
     private TransactionStatus status;
@@ -39,6 +41,10 @@ public class TransactionEntity extends AbstractPersistableEntity<UUID> {
     private PaymentMethod method;
     @Column("stripe_session_id")
     private String stripeSessionId;
+    @Column("callback_url")
+    private String callbackUrl;
+    @Column("metadata")
+    private String metadata;
     @Column("created_at")
     private Instant createdAt;
     @Column("updated_at")

@@ -2,6 +2,7 @@ package com.yowyob.payment.domain.transaction;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -17,9 +18,10 @@ import com.yowyob.payment.domain.transaction.exception.InvalidTransitionExceptio
 class TransactionStateMachineTest {
 
     private Transaction base() {
-        return new Transaction(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+        return new Transaction(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
                 BigDecimal.TEN, TransactionType.PAYMENT, TransactionStatus.CREATED,
-                "TXN-1", BigDecimal.ZERO, PaymentMethod.WALLET, null, Instant.now(), Instant.now());
+                "TXN-1", BigDecimal.ZERO, PaymentMethod.WALLET, null, null, Map.of(),
+                Instant.now(), Instant.now());
     }
 
     @Test

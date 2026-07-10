@@ -10,13 +10,13 @@ import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.web.server.SecurityWebFilterChain;
 
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.JsonErrorWriter;
+import com.yowyob.payment.infrastructure.security.KernelAuthenticationManager;
 import com.yowyob.payment.infrastructure.security.SecurityContextRepository;
-import com.yowyob.payment.infrastructure.security.YowyobAuthenticationManager;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * Configuration Spring Security WebFlux (JWT stateless + routes publiques).
+ * Configuration Spring Security WebFlux (JWT kernel RS256 + client credentials).
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -24,10 +24,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-        private static final String UNAUTHORIZED_MESSAGE = "Authentification requise : jeton JWT manquant ou invalide";
-        private static final String FORBIDDEN_MESSAGE = "Accès refusé : permissions insuffisantes pour cette ressource";
+        private static final String UNAUTHORIZED_MESSAGE =
+                "Authentification requise : JWT kernel et headers X-Client-Id, X-Api-Key, X-Tenant-Id, X-Organization-Id";
+        private static final String FORBIDDEN_MESSAGE =
+                "Accès refusé : permissions insuffisantes pour cette ressource";
 
-        private final YowyobAuthenticationManager authenticationManager;
+        private final KernelAuthenticationManager authenticationManager;
         private final SecurityContextRepository securityContextRepository;
         private final JsonErrorWriter jsonErrorWriter;
 
@@ -44,7 +46,6 @@ public class SecurityConfig {
                                 .authenticationManager(authenticationManager)
                                 .securityContextRepository(securityContextRepository)
                                 .authorizeExchange(exchanges -> exchanges
-                                                .pathMatchers(HttpMethod.POST, "/api/v1/auth/**").permitAll()
                                                 .pathMatchers(HttpMethod.POST, "/api/v1/transactions/direct")
                                                 .permitAll()
                                                 .pathMatchers(HttpMethod.POST, "/api/v1/stripe/webhooks").permitAll()
@@ -52,7 +53,8 @@ public class SecurityConfig {
                                                                 "/api/v1/stripe/cancel")
                                                 .permitAll()
                                                 .pathMatchers("/actuator/**", "/swagger-ui.html", "/swagger-ui/**",
-                                                                "/v3/api-docs", "/v3/api-docs/**", "/webjars/**")
+                                                                "/v3/api-docs", "/v3/api-docs/**", "/webjars/**",
+                                                                "/docs", "/docs/**")
                                                 .permitAll()
                                                 .anyExchange().authenticated())
                                 .exceptionHandling(spec -> spec

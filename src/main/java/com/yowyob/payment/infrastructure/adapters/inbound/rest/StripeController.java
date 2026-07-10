@@ -39,7 +39,10 @@ import reactor.core.publisher.Mono;
 /**
  * Webhooks Stripe.
  */
-@Tag(name = "Stripe", description = "Webhooks Stripe Checkout")
+@Tag(name = "Stripe", description = """
+        Webhooks Stripe Checkout et callbacks succès/annulation.
+        Route publique — signature Stripe vérifiée sur `/webhooks`.
+        """)
 @RestController
 @RequestMapping("/api/v1/stripe")
 @RequiredArgsConstructor

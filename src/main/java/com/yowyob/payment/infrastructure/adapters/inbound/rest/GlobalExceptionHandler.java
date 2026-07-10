@@ -15,12 +15,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 
-import com.yowyob.payment.domain.exception.EmailAlreadyExistsException;
 import com.yowyob.payment.domain.exception.InsufficientBalanceException;
 import com.yowyob.payment.domain.exception.TransactionNotFoundException;
 import com.yowyob.payment.domain.exception.UnsupportedPaymentMethodException;
 import com.yowyob.payment.domain.exception.UserFriendlyException;
-import com.yowyob.payment.domain.exception.UserNotFoundException;
 import com.yowyob.payment.domain.exception.WalletNotFoundException;
 import com.yowyob.payment.domain.transaction.exception.InvalidTransitionException;
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.ApiErrorResponse;
@@ -67,16 +65,6 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * @param ex utilisateur introuvable
-     * @return 404
-     */
-    @ExceptionHandler(UserNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    public Mono<ApiErrorResponse> handleUserNotFound(UserNotFoundException ex) {
-        return Mono.just(ApiErrorResponse.of(HttpStatus.NOT_FOUND, ex.getMessage()));
-    }
-
-    /**
      * @param ex solde insuffisant
      * @return 400
      */
@@ -94,16 +82,6 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
     public Mono<ApiErrorResponse> handleUnsupportedPaymentMethod(UnsupportedPaymentMethodException ex) {
         return Mono.just(ApiErrorResponse.of(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage()));
-    }
-
-    /**
-     * @param ex email dupliqué
-     * @return 409
-     */
-    @ExceptionHandler(EmailAlreadyExistsException.class)
-    @ResponseStatus(HttpStatus.CONFLICT)
-    public Mono<ApiErrorResponse> handleConflict(EmailAlreadyExistsException ex) {
-        return Mono.just(ApiErrorResponse.of(HttpStatus.CONFLICT, ex.getMessage()));
     }
 
     /**

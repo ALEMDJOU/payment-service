@@ -51,4 +51,9 @@ public class TransactionR2dbcAdapter implements TransactionRepositoryPort {
     public Flux<Transaction> findByUserId(UUID userId) {
         return repository.findByUserId(userId).map(PersistenceMapper::toDomain);
     }
+
+    @Override
+    public Flux<Transaction> findByUserIdAndOrganizationId(UUID userId, UUID organizationId) {
+        return repository.findByUserIdAndOrganizationId(userId, organizationId).map(PersistenceMapper::toDomain);
+    }
 }

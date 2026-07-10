@@ -10,11 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ServerWebExchange;
 
 import com.yowyob.payment.application.TransactionService;
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.DirectTransactionRequest;
+import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.TransactionRequest;
 import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.TransactionResponse;
-import com.yowyob.payment.infrastructure.adapters.inbound.rest.dto.WalletTransactionRequest;
+import com.yowyob.payment.infrastructure.security.KernelHeaders;
 import com.yowyob.payment.infrastructure.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,9 +32,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * API transactions (recharge, wallet-payment, direct).
+ * API transactions (recharge, paiement wallet, direct).
  */
-@Tag(name = "Transaction Management", description = "API for transaction management")
+@Tag(name = "Transactions", description = """
+                Recharge, paiement wallet et consultation des transactions.
+                **Parcours** : 1) Auth kernel → 2) `GET /wallets/me` → 3) `POST /transactions`.
+                Headers JWT : Authorization Bearer + X-Client-Id + X-Api-Key + X-Tenant-Id + X-Organization-Id.
+                Guide : [/docs/guide.md](/docs/guide.md)
+                """)
 @RestController
 @RequestMapping("/api/v1/transactions")
 @RequiredArgsConstructor
@@ -42,36 +49,29 @@ public class TransactionController {
         private final TransactionService transactionService;
 
         /**
-         * @param request recharge
+         * @param request recharge ou paiement wallet
          * @return transaction créée
          */
-        @PostMapping("/recharge")
+        @PostMapping
         @ResponseStatus(HttpStatus.CREATED)
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "Recharge wallet", description = "Crédite le portefeuille (method=WALLET) ou démarre un Stripe Checkout (method=STRIPE)")
-        @ApiResponse(responseCode = "201", description = "Transaction de recharge créée", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
-        public Mono<TransactionResponse> recharge(@Valid @RequestBody WalletTransactionRequest request) {
+        @SecurityRequirement(name = "kernelBearer")
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @SecurityRequirement(name = "kernelOrganizationId")
+        @Operation(summary = "Créer une transaction", description = """
+                        Transaction unifiée : `RECHARGE` (crédit wallet via WALLET ou Stripe Checkout)
+                        ou `WALLET_PAYMENT` (débit wallet avec frais).
+                        Exemple recharge Stripe :
+                        ```json
+                        { "type": "RECHARGE", "walletId": "...", "amount": 1000.00, "method": "STRIPE" }
+                        ```
+                        """)
+        @ApiResponse(responseCode = "201", description = "Transaction créée", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
+        public Mono<TransactionResponse> create(@Valid @RequestBody TransactionRequest request) {
                 return SecurityUtils.currentUserId()
-                                .flatMap(userId -> transactionService.recharge(userId, request.walletId(),
-                                                request.amount(),
-                                                request.method()))
-                                .map(TransactionResponse::from);
-        }
-
-        /**
-         * @param request paiement wallet
-         * @return transaction créée
-         */
-        @PostMapping("/wallet-payment")
-        @ResponseStatus(HttpStatus.CREATED)
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "Payment via wallet", description = "Débite le portefeuille avec frais configurables")
-        @ApiResponse(responseCode = "201", description = "Transaction de paiement créée", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
-        public Mono<TransactionResponse> walletPayment(@Valid @RequestBody WalletTransactionRequest request) {
-                return SecurityUtils.currentUserId()
-                                .flatMap(userId -> transactionService.walletPayment(userId, request.walletId(),
-                                                request.amount(),
-                                                request.method()))
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .flatMap(t -> transactionService.processTransaction(t.getT1(), t.getT2(), request))
                                 .map(TransactionResponse::from);
         }
 
@@ -81,24 +81,38 @@ public class TransactionController {
          */
         @PostMapping("/direct")
         @ResponseStatus(HttpStatus.CREATED)
-        @SecurityRequirement(name = "apiKeyAuth")
-        @Operation(summary = "Direct payment", description = "Paiement Stripe sans wallet - requiert le header X-Api-Key (method=STRIPE)")
-        @ApiResponse(responseCode = "201", description = "Transaction directe créée avec URL Stripe Checkout", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
-        public Mono<TransactionResponse> direct(@Valid @RequestBody DirectTransactionRequest request) {
-                return transactionService.directPayment(request.amount(), request.method(), request.userId())
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @Operation(summary = "Paiement direct (client credentials)", description = """
+                        Paiement Stripe sans wallet — auth **client credentials** uniquement
+                        (X-Client-Id + X-Api-Key + X-Tenant-Id, sans Bearer).
+                        X-Organization-Id optionnel (défaut via body `organizationId`).
+                        """)
+        @ApiResponse(responseCode = "201", description = "Transaction directe avec URL Stripe Checkout", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
+        public Mono<TransactionResponse> direct(@Valid @RequestBody DirectTransactionRequest request,
+                        ServerWebExchange exchange) {
+                return resolveOrganizationId(request.organizationId(), exchange)
+                                .flatMap(orgId -> transactionService.directPayment(request.amount(), request.method(),
+                                                request.userId(), orgId, request.callbackUrl(), request.metadata()))
                                 .map(TransactionResponse::from);
         }
 
         /**
-         * @return transactions de l'utilisateur connecté
+         * @return transactions du couple (sub, oid) courant
          */
         @GetMapping
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "List my transactions")
+        @SecurityRequirement(name = "kernelBearer")
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @SecurityRequirement(name = "kernelOrganizationId")
+        @Operation(summary = "Lister mes transactions")
         @ApiResponse(responseCode = "200", description = "Liste des transactions", content = @Content(array = @ArraySchema(schema = @Schema(implementation = TransactionResponse.class))))
         public Flux<TransactionResponse> listMine() {
                 return SecurityUtils.currentUserId()
-                                .flatMapMany(transactionService::findByUserId)
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .flatMapMany(t -> transactionService.findByUserAndOrganization(t.getT1(), t.getT2()))
                                 .map(TransactionResponse::from);
         }
 
@@ -107,11 +121,20 @@ public class TransactionController {
          * @return transaction
          */
         @GetMapping("/{id}")
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "Get transaction by ID")
+        @SecurityRequirement(name = "kernelBearer")
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @SecurityRequirement(name = "kernelOrganizationId")
+        @Operation(summary = "Détail transaction")
         @ApiResponse(responseCode = "200", description = "Transaction trouvée", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
         public Mono<TransactionResponse> getById(@PathVariable UUID id) {
-                return transactionService.findById(id).map(TransactionResponse::from);
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMap(t -> transactionService.authorizeAccess(id, t.getT1().getT1(),
+                                                t.getT1().getT2(), t.getT2()))
+                                .map(TransactionResponse::from);
         }
 
         /**
@@ -119,11 +142,20 @@ public class TransactionController {
          * @return transaction
          */
         @GetMapping("/reference/{reference}")
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "Get transaction by reference")
+        @SecurityRequirement(name = "kernelBearer")
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @SecurityRequirement(name = "kernelOrganizationId")
+        @Operation(summary = "Transaction par référence")
         @ApiResponse(responseCode = "200", description = "Transaction trouvée", content = @Content(schema = @Schema(implementation = TransactionResponse.class)))
         public Mono<TransactionResponse> getByReference(@PathVariable String reference) {
-                return transactionService.findByReference(reference).map(TransactionResponse::from);
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMap(t -> transactionService.findByReferenceAuthorized(reference, t.getT1().getT1(),
+                                                t.getT1().getT2(), t.getT2()))
+                                .map(TransactionResponse::from);
         }
 
         /**
@@ -131,10 +163,35 @@ public class TransactionController {
          * @return historique
          */
         @GetMapping("/wallet/{walletId}")
-        @SecurityRequirement(name = "bearerAuth")
-        @Operation(summary = "Get transactions by wallet ID")
-        @ApiResponse(responseCode = "200", description = "Historique des transactions du portefeuille", content = @Content(array = @ArraySchema(schema = @Schema(implementation = TransactionResponse.class))))
+        @SecurityRequirement(name = "kernelBearer")
+        @SecurityRequirement(name = "kernelClientId")
+        @SecurityRequirement(name = "kernelApiKey")
+        @SecurityRequirement(name = "kernelTenantId")
+        @SecurityRequirement(name = "kernelOrganizationId")
+        @Operation(summary = "Transactions d'un portefeuille")
+        @ApiResponse(responseCode = "200", description = "Historique des transactions", content = @Content(array = @ArraySchema(schema = @Schema(implementation = TransactionResponse.class))))
         public Flux<TransactionResponse> getByWallet(@PathVariable UUID walletId) {
-                return transactionService.findByWalletId(walletId).map(TransactionResponse::from);
+                return SecurityUtils.currentUserId()
+                                .zipWith(SecurityUtils.currentOrganizationId())
+                                .zipWith(SecurityUtils.isAdmin())
+                                .flatMapMany(t -> transactionService.findByWalletIdAuthorized(walletId,
+                                                t.getT1().getT1(), t.getT1().getT2(), t.getT2()))
+                                .map(TransactionResponse::from);
+        }
+
+        private Mono<UUID> resolveOrganizationId(UUID bodyOrgId, ServerWebExchange exchange) {
+                if (bodyOrgId != null) {
+                        return Mono.just(bodyOrgId);
+                }
+                String headerOrg = exchange.getRequest().getHeaders().getFirst(KernelHeaders.ORGANIZATION_ID);
+                if (headerOrg != null && !headerOrg.isBlank()) {
+                        return Mono.just(UUID.fromString(headerOrg.trim()));
+                }
+                Object attr = exchange.getAttribute(KernelHeaders.ORGANIZATION_ID);
+                if (attr instanceof String s && !s.isBlank()) {
+                        return Mono.just(UUID.fromString(s.trim()));
+                }
+                return Mono.error(new IllegalArgumentException(
+                                "organizationId requis : header X-Organization-Id ou champ body"));
         }
 }

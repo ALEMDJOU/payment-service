@@ -11,6 +11,7 @@ public record WalletEvent(
                 String eventType,
                 UUID walletId,
                 UUID userId,
+                UUID organizationId,
                 BigDecimal previousBalance,
                 BigDecimal newBalance,
                 BigDecimal delta,

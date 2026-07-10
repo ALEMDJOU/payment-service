@@ -22,13 +22,15 @@ spring:
       group-id: test-group
 
 yowyob:
-  jwt:
-    secret: B7lNty52nURS1lCg6KjEvPh6e71c/ndOh1H4mCMRMgo=
-    expiration-ms: 3600000
-  admin:
-    email: admin@test.local
-    password: admin
-    name: Admin
+  kernel:
+    base-url: https://kernel-core.test.local
+    client-id: test-client-id
+    api-key: test-api-key
+    tenant-id: test-tenant-id
+    jwks-uri: https://kernel-core.test.local/.well-known/jwks.json
+    issuer: https://kernel-core.test.local
+    permissions:
+      admin: payments:admin
   redis:
     ttl-seconds: 60
   fees:
@@ -44,9 +46,6 @@ yowyob:
   kafka:
     topic-transaction-events: test.transaction.events
     topic-wallet-events: test.wallet.events
-    topic-wallet-create: wallet-create-topic
-    consumer:
-      enabled: false
   stripe:
     secret-key: sk_test_placeholder
     webhook-secret: whsec_placeholder

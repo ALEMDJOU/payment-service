@@ -24,16 +24,24 @@ public interface WalletRepositoryPort {
     Mono<Wallet> findById(UUID id);
 
     /**
+     * @param userId         propriétaire (claim sub)
+     * @param organizationId organisation (claim oid)
+     * @return portefeuille ou vide
+     */
+    Mono<Wallet> findByUserIdAndOrganizationId(UUID userId, UUID organizationId);
+
+    /**
      * @param userId propriétaire
      * @return portefeuilles de l'utilisateur
      */
     Flux<Wallet> findByUserId(UUID userId);
 
     /**
-     * @param userId propriétaire
-     * @return premier portefeuille trouvé
+     * @param userId         propriétaire
+     * @param organizationId organisation (filtre optionnel)
+     * @return portefeuilles filtrés
      */
-    Mono<Wallet> findFirstByUserId(UUID userId);
+    Flux<Wallet> findByUserIdAndOrganizationIdFilter(UUID userId, UUID organizationId);
 
     /**
      * @return tous les portefeuilles
@@ -45,12 +53,6 @@ public interface WalletRepositoryPort {
      * @return portefeuille persisté
      */
     Mono<Wallet> update(Wallet wallet);
-
-    /**
-     * @param id identifiant
-     * @return void upon delete
-     */
-    Mono<Void> deleteById(UUID id);
 
     /**
      * Débite le portefeuille de façon atomique.

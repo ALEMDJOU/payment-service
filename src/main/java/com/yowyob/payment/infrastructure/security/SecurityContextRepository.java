@@ -1,5 +1,7 @@
 package com.yowyob.payment.infrastructure.security;
 
+import java.util.UUID;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -13,14 +15,15 @@ import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
 /**
- * Charge le contexte de sécurité depuis le header Authorization Bearer.
+ * Charge le contexte de sécurité depuis le JWT kernel RS256.
  */
 @Component
 @RequiredArgsConstructor
 public class SecurityContextRepository implements ServerSecurityContextRepository {
 
-    private final JwtUtil jwtUtil;
-    private final com.yowyob.payment.domain.user.UserRepositoryPort userRepository;
+    private static final String DIRECT_PATH = "/api/v1/transactions/direct";
+
+    private final KernelJwtValidator jwtValidator;
 
     @Override
     public Mono<Void> save(ServerWebExchange exchange, SecurityContext context) {
@@ -29,23 +32,43 @@ public class SecurityContextRepository implements ServerSecurityContextRepositor
 
     @Override
     public Mono<SecurityContext> load(ServerWebExchange exchange) {
+        String path = exchange.getRequest().getPath().value();
+        if (DIRECT_PATH.equals(path)) {
+            return Mono.empty();
+        }
+
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return Mono.empty();
         }
-        String token = authHeader.substring(7);
-        try {
-            String email = jwtUtil.extractUsername(token);
-            return userRepository.findByEmail(email)
-                    .filter(user -> jwtUtil.validateToken(token, email))
-                    .map(user -> {
-                        AuthPrincipal principal = new AuthPrincipal(user);
-                        Authentication auth = new UsernamePasswordAuthenticationToken(
-                                principal, null, principal.getAuthorities());
-                        return new SecurityContextImpl(auth);
-                    });
-        } catch (Exception ex) {
+        String token = authHeader.substring(7).trim();
+        if (token.isEmpty()) {
             return Mono.empty();
+        }
+
+        return jwtValidator.validate(token)
+                .flatMap(principal -> {
+                    String headerOrgId = exchange.getRequest().getHeaders()
+                            .getFirst(KernelHeaders.ORGANIZATION_ID);
+                    if (headerOrgId != null && !headerOrgId.isBlank()) {
+                        UUID headerOrg = parseUuid(headerOrgId);
+                        if (headerOrg != null && !headerOrg.equals(principal.getOrganizationId())) {
+                            return Mono.empty();
+                        }
+                    }
+                    Authentication auth = new UsernamePasswordAuthenticationToken(
+                            principal, null, principal.getAuthorities());
+                    SecurityContext context = new SecurityContextImpl(auth);
+                    return Mono.just(context);
+                })
+                .onErrorResume(ex -> Mono.empty());
+    }
+
+    private UUID parseUuid(String value) {
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
         }
     }
 }

@@ -5,18 +5,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Modèle domaine portefeuille.
- *
- * @param id        identifiant
- * @param userId    propriétaire
- * @param balance   solde courant
- * @param status    statut
- * @param createdAt création
- * @param updatedAt mise à jour
+ * Modèle domaine portefeuille (couple userId + organizationId kernel).
  */
 public record Wallet(
         UUID id,
         UUID userId,
+        UUID organizationId,
         BigDecimal balance,
         WalletStatus status,
         Instant createdAt,
@@ -27,7 +21,7 @@ public record Wallet(
      * @return wallet avec solde mis à jour
      */
     public Wallet withBalance(BigDecimal newBalance) {
-        return new Wallet(id, userId, newBalance, status, createdAt, Instant.now());
+        return new Wallet(id, userId, organizationId, newBalance, status, createdAt, Instant.now());
     }
 
     /**
@@ -35,6 +29,6 @@ public record Wallet(
      * @return wallet avec statut mis à jour
      */
     public Wallet withStatus(WalletStatus newStatus) {
-        return new Wallet(id, userId, balance, newStatus, createdAt, Instant.now());
+        return new Wallet(id, userId, organizationId, balance, newStatus, createdAt, Instant.now());
     }
 }

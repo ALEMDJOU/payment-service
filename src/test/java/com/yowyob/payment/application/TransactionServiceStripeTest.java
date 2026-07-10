@@ -2,6 +2,7 @@ package com.yowyob.payment.application;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +32,7 @@ import com.yowyob.payment.domain.transaction.TransactionType;
 import com.yowyob.payment.domain.wallet.Wallet;
 import com.yowyob.payment.domain.wallet.WalletRepositoryPort;
 import com.yowyob.payment.domain.wallet.WalletStatus;
+import com.yowyob.payment.domain.webhook.ConsumerWebhookNotifierPort;
 import com.yowyob.payment.infrastructure.adapters.outbound.redis.WalletBalanceCache;
 
 import reactor.core.publisher.Mono;
@@ -61,11 +63,14 @@ class TransactionServiceStripeTest {
     private WalletBalanceCache balanceCache;
     @Mock
     private TransactionalOperator transactionalOperator;
+    @Mock
+    private ConsumerWebhookNotifierPort consumerWebhookNotifier;
 
     @InjectMocks
     private TransactionService transactionService;
 
     private UUID userId;
+    private UUID organizationId;
     private UUID walletId;
     private Wallet wallet;
 
@@ -76,17 +81,21 @@ class TransactionServiceStripeTest {
         ReflectionTestUtils.setField(transactionService, "maxAmount", new BigDecimal("1000000"));
 
         userId = UUID.randomUUID();
+        organizationId = UUID.randomUUID();
         walletId = UUID.randomUUID();
-        wallet = new Wallet(walletId, userId, BigDecimal.ZERO, WalletStatus.ACTIVE, Instant.now(), Instant.now());
+        wallet = new Wallet(walletId, userId, organizationId, BigDecimal.ZERO, WalletStatus.ACTIVE,
+                Instant.now(), Instant.now());
 
         when(transactionEventPublisher.publish(any())).thenReturn(Mono.empty());
         when(walletEventPublisher.publish(any())).thenReturn(Mono.empty());
+        when(consumerWebhookNotifier.enqueue(any(), any(), any())).thenReturn(Mono.empty());
         when(transactionalOperator.transactional(any(Mono.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
     void rechargeWithMomoShouldRejectExplicitly() {
-        StepVerifier.create(transactionService.recharge(userId, walletId, new BigDecimal("1000"), PaymentMethod.MOMO))
+        StepVerifier.create(transactionService.recharge(userId, organizationId, walletId,
+                new BigDecimal("1000"), PaymentMethod.MOMO, null, null))
                 .expectError(UnsupportedPaymentMethodException.class)
                 .verify();
     }
@@ -101,12 +110,13 @@ class TransactionServiceStripeTest {
         session.setId("cs_test_123");
         session.setUrl("https://checkout.stripe.com/pay/cs_test_123");
 
-        when(walletService.authorizeAccess(walletId, userId, false)).thenReturn(Mono.just(wallet));
+        when(walletService.authorizeAccess(walletId, userId, organizationId, false)).thenReturn(Mono.just(wallet));
         when(transactionRepository.save(any())).thenReturn(Mono.just(created));
         when(transactionRepository.update(any())).thenReturn(Mono.just(pending), Mono.just(withSession));
         when(stripeService.createCheckoutSession(any())).thenReturn(Mono.just(session));
 
-        StepVerifier.create(transactionService.recharge(userId, walletId, new BigDecimal("1000"), PaymentMethod.STRIPE))
+        StepVerifier.create(transactionService.recharge(userId, organizationId, walletId,
+                new BigDecimal("1000"), PaymentMethod.STRIPE, null, null))
                 .assertNext(result -> {
                     assertEquals(TransactionStatus.PENDING, result.transaction().status());
                     assertEquals("cs_test_123", result.transaction().stripeSessionId());
@@ -149,14 +159,16 @@ class TransactionServiceStripeTest {
 
     @Test
     void directPaymentWithPaypalShouldRejectExplicitly() {
-        StepVerifier.create(transactionService.directPayment(new BigDecimal("500"), PaymentMethod.PAYPAL, userId))
+        StepVerifier.create(transactionService.directPayment(new BigDecimal("500"), PaymentMethod.PAYPAL, userId,
+                organizationId, null, null))
                 .expectError(UnsupportedPaymentMethodException.class)
                 .verify();
     }
 
     private Transaction sampleTransaction(TransactionStatus status, TransactionType type, PaymentMethod method) {
-        Transaction tx = new Transaction(UUID.randomUUID(), walletId, userId, new BigDecimal("1000"), type, status,
-                "YYPAY-1", BigDecimal.ZERO, method, null, Instant.now(), Instant.now());
+        Transaction tx = new Transaction(UUID.randomUUID(), walletId, userId, organizationId,
+                new BigDecimal("1000"), type, status, "YYPAY-1", BigDecimal.ZERO, method, null, null, Map.of(),
+                Instant.now(), Instant.now());
         assertNotNull(tx.id());
         return tx;
     }
