@@ -11,6 +11,29 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Le service `liquibase` applique les migrations **avant** le démarrage de l'application (`app` dépend de `liquibase` avec `service_completed_successfully`). Ne lancez pas l'API sans schéma à jour.
+
+### Déploiement / base existante
+
+Sur une base PostgreSQL déjà provisionnée (hors Docker Compose), exécutez Liquibase **avant** de démarrer l'application :
+
+```bash
+cd yowyob-payment/docker
+export $(grep -v '^#' .env | xargs)
+
+docker run --rm \
+  -v "$(pwd)/liquibase/changelog:/liquibase/changelog" \
+  liquibase/liquibase:4.27 \
+  --url="jdbc:postgresql://${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME}" \
+  --username="${DB_USER}" \
+  --password="${DB_PASSWORD}" \
+  --changeLogFile=db.changelog-master.xml \
+  --search-path=/liquibase/changelog \
+  update
+```
+
+Pour une base créée avec une ancienne version du schéma (sans `callback_url` / `metadata` sur `yy-pay-transactions`), le changeset `004-alter-transactions-callback-metadata` ajoute les colonnes manquantes de façon idempotente.
+
 - API : <http://localhost:8080>
 - **Guide consommateur** : <http://localhost:8080/docs> → `/docs/guide.md`
 - Swagger : <http://localhost:8080/swagger-ui.html>
@@ -102,8 +125,10 @@ Toutes les erreurs retournent un JSON explicite (`status`, `code`, `message`, `f
 ## Tests
 
 ```bash
-./mvnw test
+./mvnw verify
 ```
+
+Les tests d'intégration R2DBC (`TransactionR2dbcAdapterIT`) utilisent Testcontainers PostgreSQL et valident la persistance des colonnes `callback_url` et `metadata`.
 
 ## Stack
 

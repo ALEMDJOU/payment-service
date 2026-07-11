@@ -17,6 +17,8 @@
                 fees DECIMAL(19,4) NOT NULL DEFAULT 0.0,
                 method VARCHAR(32) NOT NULL,
                 stripe_session_id VARCHAR(512),
+                callback_url VARCHAR(2048),
+                metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );

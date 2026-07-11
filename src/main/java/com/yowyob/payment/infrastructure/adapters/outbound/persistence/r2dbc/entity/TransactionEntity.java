@@ -12,6 +12,8 @@ import com.yowyob.payment.domain.transaction.PaymentMethod;
 import com.yowyob.payment.domain.transaction.TransactionStatus;
 import com.yowyob.payment.domain.transaction.TransactionType;
 
+import io.r2dbc.postgresql.codec.Json;
+
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -44,7 +46,7 @@ public class TransactionEntity extends AbstractPersistableEntity<UUID> {
     @Column("callback_url")
     private String callbackUrl;
     @Column("metadata")
-    private String metadata;
+    private Json metadata;
     @Column("created_at")
     private Instant createdAt;
     @Column("updated_at")

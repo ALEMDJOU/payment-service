@@ -10,6 +10,8 @@ import org.springframework.data.relational.core.mapping.Table;
 import com.yowyob.payment.domain.webhook.ConsumerWebhookEventType;
 import com.yowyob.payment.domain.webhook.WebhookOutboxStatus;
 
+import io.r2dbc.postgresql.codec.Json;
+
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -31,7 +33,7 @@ public class WebhookOutboxEntity extends AbstractPersistableEntity<UUID> {
     private ConsumerWebhookEventType eventType;
     @Column("callback_url")
     private String callbackUrl;
-    private String payload;
+    private Json payload;
     private WebhookOutboxStatus status;
     @Column("attempt_count")
     private int attemptCount;

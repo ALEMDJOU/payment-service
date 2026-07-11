@@ -5,6 +5,9 @@ import com.yowyob.payment.domain.wallet.Wallet;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.entity.TransactionEntity;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.entity.WalletEntity;
 import com.yowyob.payment.infrastructure.support.JsonSupport;
+import java.util.Map;
+
+import io.r2dbc.postgresql.codec.Json;
 
 /**
  * Mapping entités R2DBC vers modèles domaine.
@@ -12,6 +15,14 @@ import com.yowyob.payment.infrastructure.support.JsonSupport;
 public final class PersistenceMapper {
 
     private PersistenceMapper() {
+    }
+
+    private static Map<String, String> metadataToDomain(Json metadata) {
+        return metadata == null ? null : JsonSupport.readStringMap(metadata.asString());
+    }
+
+    private static Json metadataToEntity(Map<String, String> metadata) {
+        return Json.of(JsonSupport.writeStringMap(metadata));
     }
 
     /**
@@ -57,7 +68,7 @@ public final class PersistenceMapper {
         return new Transaction(entity.getId(), entity.getWalletId(), entity.getUserId(),
                 entity.getOrganizationId(), entity.getAmount(), entity.getType(), entity.getStatus(),
                 entity.getReference(), entity.getFees(), entity.getMethod(), entity.getStripeSessionId(),
-                entity.getCallbackUrl(), JsonSupport.readStringMap(entity.getMetadata()),
+                entity.getCallbackUrl(), metadataToDomain(entity.getMetadata()),
                 entity.getCreatedAt(), entity.getUpdatedAt());
     }
 
@@ -79,7 +90,7 @@ public final class PersistenceMapper {
                 .method(tx.method())
                 .stripeSessionId(tx.stripeSessionId())
                 .callbackUrl(tx.callbackUrl())
-                .metadata(JsonSupport.writeStringMap(tx.metadata()))
+                .metadata(metadataToEntity(tx.metadata()))
                 .createdAt(tx.createdAt())
                 .updatedAt(tx.updatedAt())
                 .build();
