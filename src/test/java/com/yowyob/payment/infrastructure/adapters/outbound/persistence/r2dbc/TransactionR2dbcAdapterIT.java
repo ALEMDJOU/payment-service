@@ -34,7 +34,6 @@ import com.yowyob.payment.domain.webhook.WebhookOutboxStatus;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.mapper.PersistenceMapper;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.repository.WalletR2dbcRepository;
 import com.yowyob.payment.infrastructure.config.R2dbcConfig;
-import com.yowyob.payment.infrastructure.support.JsonSupport;
 
 import io.r2dbc.spi.ConnectionFactory;
 import reactor.test.StepVerifier;
@@ -139,9 +138,7 @@ class TransactionR2dbcAdapterIT {
                 .verifyComplete();
 
         StepVerifier.create(webhookOutboxAdapter.findById(entry.id()))
-                .assertNext(loaded -> assertEquals(
-                        JsonSupport.readStringMap(payloadJson),
-                        JsonSupport.readStringMap(loaded.payloadJson())))
+                .assertNext(loaded -> assertEquals(payloadJson, loaded.payloadJson()))
                 .verifyComplete();
     }
 }

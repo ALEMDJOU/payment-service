@@ -1,0 +1,8 @@
+target/
+.m2/
+.git/
+.idea/
+.cursor/
+*.iml
+.env
+docker/.env

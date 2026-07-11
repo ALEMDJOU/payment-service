@@ -1,11 +1,12 @@
 package com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.mapper;
 
+import java.util.Map;
+
 import com.yowyob.payment.domain.transaction.Transaction;
 import com.yowyob.payment.domain.wallet.Wallet;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.entity.TransactionEntity;
 import com.yowyob.payment.infrastructure.adapters.outbound.persistence.r2dbc.entity.WalletEntity;
 import com.yowyob.payment.infrastructure.support.JsonSupport;
-import java.util.Map;
 
 import io.r2dbc.postgresql.codec.Json;
 
@@ -18,11 +19,14 @@ public final class PersistenceMapper {
     }
 
     private static Map<String, String> metadataToDomain(Json metadata) {
-        return metadata == null ? null : JsonSupport.readStringMap(metadata.asString());
+        if (metadata == null) {
+            return Map.of();
+        }
+        return JsonSupport.readStringMap(metadata.asString());
     }
 
     private static Json metadataToEntity(Map<String, String> metadata) {
-        return Json.of(JsonSupport.writeStringMap(metadata));
+        return Json.of(JsonSupport.writeStringMap(metadata == null ? Map.of() : metadata));
     }
 
     /**
