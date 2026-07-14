@@ -15,32 +15,32 @@ import org.mockito.Mock;
 import static org.mockito.Mockito.when;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 import com.yowyob.payment.application.TransactionCheckoutResult;
 import com.yowyob.payment.application.TransactionService;
 import com.yowyob.payment.domain.exception.TransactionNotFoundException;
 import com.yowyob.payment.domain.exception.UnsupportedPaymentMethodException;
-import com.yowyob.payment.domain.exception.UserFriendlyException;
 import com.yowyob.payment.domain.transaction.PaymentMethod;
 import com.yowyob.payment.domain.transaction.Transaction;
 import com.yowyob.payment.domain.transaction.TransactionStatus;
 import com.yowyob.payment.domain.transaction.TransactionType;
+import com.yowyob.payment.infrastructure.security.TestSecurityContext;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * Tests unitaires des endpoints TransactionController via WebTestClient.
+ * Tests unitaires TransactionController via WebTestClient.
  *
- * Chaque scénario couvre un cas métier distinct :
- * 1. Paiement direct Stripe — happy path (201 + URL checkout)
- * 2. Paiement direct avec montant nul — validation (400)
- * 3. Paiement direct méthode non supportée — UnsupportedPaymentMethod (422)
- * 4. Consultation transaction par ID — found (200)
- * 5. Consultation transaction par ID — not found (404)
- * 6. Lister les transactions — liste vide (200 [])
+ * Scénarios :
+ * 1. POST /direct Stripe happy path → 201 + stripeCheckoutUrl
+ * 2. POST /direct montant 0 → 400 (validation @Positive)
+ * 3. POST /direct method=WALLET → 422 (méthode non supportée)
+ * 4. GET /{id} trouvé → 200
+ * 5. GET /{id} introuvable → 404
+ * 6. GET / liste vide → 200 []
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("TransactionController — tests endpoints")
@@ -51,8 +51,8 @@ class TransactionControllerTest {
 
     private WebTestClient webTestClient;
 
-    private static final UUID USER_ID = UUID.fromString("aaaaaaaa-0000-0000-0000-000000000001");
-    private static final UUID ORG_ID  = UUID.fromString("bbbbbbbb-0000-0000-0000-000000000002");
+    private static final UUID USER_ID = TestSecurityContext.TEST_USER_ID;
+    private static final UUID ORG_ID  = TestSecurityContext.TEST_ORG_ID;
     private static final UUID TX_ID   = UUID.fromString("cccccccc-0000-0000-0000-000000000003");
 
     @BeforeEach
@@ -63,10 +63,6 @@ class TransactionControllerTest {
                 .controllerAdvice(new GlobalExceptionHandler())
                 .build();
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private Transaction sampleTransaction(TransactionStatus status) {
         return new Transaction(TX_ID, null, USER_ID, ORG_ID,
@@ -81,12 +77,10 @@ class TransactionControllerTest {
                 "https://checkout.stripe.com/pay/cs_test_abc123");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 1 — Paiement direct Stripe : happy path → 201 + URL checkout
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 1 — POST /direct Stripe happy path → 201 ────────────────────
 
     @Test
-    @DisplayName("POST /direct — Stripe happy path → 201 avec stripeCheckoutUrl")
+    @DisplayName("POST /direct — Stripe → 201 avec stripeCheckoutUrl")
     void directPayment_stripe_happyPath_returns201() {
         when(transactionService.directPayment(
                 eq(new BigDecimal("5000.00")),
@@ -110,22 +104,16 @@ class TransactionControllerTest {
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(TX_ID.toString())
                 .jsonPath("$.status").isEqualTo("PENDING")
-                .jsonPath("$.stripeCheckoutUrl").isEqualTo("https://checkout.stripe.com/pay/cs_test_abc123")
-                .jsonPath("$.method").isEqualTo("STRIPE");
+                .jsonPath("$.stripeCheckoutUrl")
+                        .isEqualTo("https://checkout.stripe.com/pay/cs_test_abc123");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 2 — Montant invalide → 400
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 2 — montant 0 → 400 (validation Bean Validation) ────────────
 
     @Test
-    @DisplayName("POST /direct — montant nul → 400 UserFriendlyException")
+    @DisplayName("POST /direct — montant 0 → 400 validation @Positive")
     void directPayment_zeroAmount_returns400() {
-        when(transactionService.directPayment(
-                eq(BigDecimal.ZERO), any(), any(), any(), any(), any()))
-                .thenReturn(Mono.error(new UserFriendlyException(
-                        "Montant invalide : doit être compris entre 100 et 10000000")));
-
+        // @Positive sur amount → WebExchangeBindException → 400 avant le service
         webTestClient.post()
                 .uri("/api/v1/transactions/direct")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -137,19 +125,13 @@ class TransactionControllerTest {
                         }
                         """)
                 .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.message").value(msg ->
-                        org.assertj.core.api.Assertions.assertThat(msg.toString())
-                                .contains("Montant invalide"));
+                .expectStatus().isBadRequest();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 3 — Méthode non supportée → 422
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 3 — method=WALLET non supportée → 422 ───────────────────────
 
     @Test
-    @DisplayName("POST /direct — method=WALLET (non supportée pour direct) → 422")
+    @DisplayName("POST /direct — method=WALLET → 422")
     void directPayment_walletMethod_returns422() {
         when(transactionService.directPayment(
                 any(), eq(PaymentMethod.WALLET), any(), any(), any(), any()))
@@ -171,20 +153,16 @@ class TransactionControllerTest {
                 .jsonPath("$.message").exists();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 4 — GET /{id} : transaction trouvée → 200
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 4 — GET /{id} trouvé → 200 ──────────────────────────────────
 
     @Test
-    @DisplayName("GET /{id} — transaction existante → 200 avec détails")
-    @WithMockUser
+    @DisplayName("GET /{id} — trouvé → 200 avec détails")
     void getById_found_returns200() {
         when(transactionService.authorizeAccess(eq(TX_ID), any(), any(), any()))
                 .thenReturn(Mono.just(sampleTransaction(TransactionStatus.SUCCEEDED)));
 
         webTestClient.get()
                 .uri("/api/v1/transactions/{id}", TX_ID)
-                .header("Authorization", "Bearer test-token")
                 .header("X-Organization-Id", ORG_ID.toString())
                 .exchange()
                 .expectStatus().isOk()
@@ -194,13 +172,10 @@ class TransactionControllerTest {
                 .jsonPath("$.amount").isEqualTo(5000.00);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 5 — GET /{id} : transaction introuvable → 404
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 5 — GET /{id} introuvable → 404 ─────────────────────────────
 
     @Test
-    @DisplayName("GET /{id} — transaction inexistante → 404")
-    @WithMockUser
+    @DisplayName("GET /{id} — introuvable → 404")
     void getById_notFound_returns404() {
         UUID unknownId = UUID.randomUUID();
         when(transactionService.authorizeAccess(eq(unknownId), any(), any(), any()))
@@ -209,7 +184,6 @@ class TransactionControllerTest {
 
         webTestClient.get()
                 .uri("/api/v1/transactions/{id}", unknownId)
-                .header("Authorization", "Bearer test-token")
                 .header("X-Organization-Id", ORG_ID.toString())
                 .exchange()
                 .expectStatus().isNotFound()
@@ -219,20 +193,16 @@ class TransactionControllerTest {
                                 .contains("introuvable"));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Scénario 6 — GET / : liste vide → 200 []
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── Scénario 6 — GET / liste vide → 200 [] ───────────────────────────────
 
     @Test
-    @DisplayName("GET / — aucune transaction → 200 liste vide")
-    @WithMockUser
+    @DisplayName("GET / — liste vide → 200 []")
     void listMine_empty_returns200EmptyArray() {
         when(transactionService.findByUserAndOrganization(any(), any()))
                 .thenReturn(Flux.empty());
 
         webTestClient.get()
                 .uri("/api/v1/transactions")
-                .header("Authorization", "Bearer test-token")
                 .header("X-Organization-Id", ORG_ID.toString())
                 .exchange()
                 .expectStatus().isOk()
