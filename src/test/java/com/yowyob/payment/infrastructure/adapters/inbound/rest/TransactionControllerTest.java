@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.Mock;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,7 @@ import com.yowyob.payment.domain.transaction.TransactionStatus;
 import com.yowyob.payment.domain.transaction.TransactionType;
 import com.yowyob.payment.infrastructure.security.TestSecurityContext;
 
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -158,7 +160,7 @@ class TransactionControllerTest {
     @Test
     @DisplayName("GET /{id} — trouvé → 200 avec détails")
     void getById_found_returns200() {
-        when(transactionService.authorizeAccess(eq(TX_ID), any(), any(), any()))
+        when(transactionService.authorizeAccess(eq(TX_ID), any(), any(), anyBoolean()))
                 .thenReturn(Mono.just(sampleTransaction(TransactionStatus.SUCCEEDED)));
 
         webTestClient.get()
@@ -178,7 +180,7 @@ class TransactionControllerTest {
     @DisplayName("GET /{id} — introuvable → 404")
     void getById_notFound_returns404() {
         UUID unknownId = UUID.randomUUID();
-        when(transactionService.authorizeAccess(eq(unknownId), any(), any(), any()))
+        when(transactionService.authorizeAccess(eq(unknownId), any(), any(), anyBoolean()))
                 .thenReturn(Mono.error(
                         new TransactionNotFoundException("Transaction introuvable: " + unknownId)));
 
