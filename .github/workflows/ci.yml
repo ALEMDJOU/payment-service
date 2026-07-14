@@ -13,11 +13,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout ─────────────────────────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Java 21 + Maven ──────────────────────────────────────────────────
       - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
@@ -25,21 +23,27 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      # ── 3. Compile ──────────────────────────────────────────────────────────
-      - name: Compile
-        run: mvn -q compile -DskipTests
+      - name: Debug environment
+        run: |
+          echo "Java: $(java -version 2>&1 | head -1)"
+          echo "Maven: $(mvn -version 2>&1 | head -1)"
+          echo "Working dir: $(pwd)"
+          echo "pom.xml exists: $(ls -la pom.xml)"
+
+      - name: Compile (full output)
+        run: |
+          mvn compile -DskipTests 2>&1
         env:
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
           STRIPE_SUCCESS_URL: http://localhost:8080/stripe/success
           STRIPE_CANCEL_URL: http://localhost:8080/stripe/cancel
           STRIPE_CURRENCY: usd
-          SWAGGER_TITLE: Payment API CI
-          SWAGGER_DESCRIPTION: CI build
-          SWAGGER_VERSION: 1.0.0
-          SWAGGER_SERVER_URL: http://localhost:8080
+          SWAGGER_TITLE: "Payment API"
+          SWAGGER_DESCRIPTION: "CI"
+          SWAGGER_VERSION: "1.0.0"
+          SWAGGER_SERVER_URL: "http://localhost:8080"
 
-      # ── 4. Tests unitaires (sans Testcontainers) ─────────────────────────────
       - name: Unit tests
         run: |
           mvn test \
@@ -78,12 +82,11 @@ jobs:
           STRIPE_SUCCESS_URL: http://localhost:8080/stripe/success
           STRIPE_CANCEL_URL: http://localhost:8080/stripe/cancel
           STRIPE_CURRENCY: usd
-          SWAGGER_TITLE: Payment API CI
-          SWAGGER_DESCRIPTION: CI build
-          SWAGGER_VERSION: 1.0.0
-          SWAGGER_SERVER_URL: http://localhost:8080
+          SWAGGER_TITLE: "Payment API"
+          SWAGGER_DESCRIPTION: "CI"
+          SWAGGER_VERSION: "1.0.0"
+          SWAGGER_SERVER_URL: "http://localhost:8080"
 
-      # ── 5. Tests d'intégration (Testcontainers + PostgreSQL) ─────────────────
       - name: Integration tests (Testcontainers)
         run: |
           mvn test \
@@ -95,12 +98,11 @@ jobs:
           STRIPE_SUCCESS_URL: http://localhost:8080/stripe/success
           STRIPE_CANCEL_URL: http://localhost:8080/stripe/cancel
           STRIPE_CURRENCY: usd
-          SWAGGER_TITLE: Payment API CI
-          SWAGGER_DESCRIPTION: CI build
-          SWAGGER_VERSION: 1.0.0
-          SWAGGER_SERVER_URL: http://localhost:8080
+          SWAGGER_TITLE: "Payment API"
+          SWAGGER_DESCRIPTION: "CI"
+          SWAGGER_VERSION: "1.0.0"
+          SWAGGER_SERVER_URL: "http://localhost:8080"
 
-      # ── 6. Rapport de tests ──────────────────────────────────────────────────
       - name: Test report
         uses: dorny/test-reporter@v1
         if: always()
@@ -110,7 +112,6 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      # ── 7. Upload artefacts en cas d'échec ───────────────────────────────────
       - name: Upload surefire reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
