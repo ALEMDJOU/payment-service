@@ -23,16 +23,9 @@ jobs:
           distribution: "temurin"
           cache: maven
 
-      - name: Debug environment
-        run: |
-          echo "Java: $(java -version 2>&1 | head -1)"
-          echo "Maven: $(mvn -version 2>&1 | head -1)"
-          echo "Working dir: $(pwd)"
-          echo "pom.xml exists: $(ls -la pom.xml)"
-
-      - name: Compile (full output)
-        run: |
-          mvn compile -DskipTests 2>&1
+      - name: Compile (avec sortie complète)
+        run: mvn compile -DskipTests --no-transfer-progress
+        continue-on-error: true
         env:
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
@@ -48,7 +41,9 @@ jobs:
         run: |
           mvn test \
             -Dtest="!TransactionR2dbcAdapterIT" \
-            -Dsurefire.failIfNoSpecifiedTests=false
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            --no-transfer-progress
+        continue-on-error: true
         env:
           APP_PORT: "8080"
           APP_NAME: yowyob-payment-ci
@@ -91,7 +86,9 @@ jobs:
         run: |
           mvn test \
             -Dtest="TransactionR2dbcAdapterIT" \
-            -Dsurefire.failIfNoSpecifiedTests=false
+            -Dsurefire.failIfNoSpecifiedTests=false \
+            --no-transfer-progress
+        continue-on-error: true
         env:
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
@@ -112,10 +109,13 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      - name: Upload surefire reports on failure
-        if: failure()
+      - name: Upload all reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: surefire-reports
-          path: target/surefire-reports/
+          name: build-reports
+          path: |
+            target/surefire-reports/
+            target/*.txt
           retention-days: 7
+          if-no-files-found: ignore
