@@ -38,7 +38,11 @@ public class WebhookOutboxProcessor {
         outboxRepository.findReadyForDelivery(properties.getBatchSize())
                 .flatMap(this::deliverSafely)
                 .onErrorContinue((error, entry) -> log.error("Erreur traitement outbox webhook", error))
-                .subscribe();
+                .subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic())
+                .subscribe(
+                    null,
+                    error -> log.error("Erreur fatale outbox webhook processor", error)
+                );
     }
 
     private Mono<Void> deliverSafely(WebhookOutboxEntry entry) {

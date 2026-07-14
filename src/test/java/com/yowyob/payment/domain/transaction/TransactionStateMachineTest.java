@@ -33,15 +33,15 @@ class TransactionStateMachineTest {
     @Test
     void shouldAllowPendingToSucceeded() {
         Transaction pending = TransactionStateMachine.transition(base(), TransactionStatus.PENDING);
-        Transaction result = TransactionStateMachine.transition(pending, TransactionStatus.SUCCESSED);
-        assertEquals(TransactionStatus.SUCCESSED, result.status());
+        Transaction result = TransactionStateMachine.transition(pending, TransactionStatus.SUCCEEDED);
+        assertEquals(TransactionStatus.SUCCEEDED, result.status());
     }
 
     @Test
     void shouldRejectSucceededToPending() {
         Transaction tx = TransactionStateMachine.transition(
                 TransactionStateMachine.transition(base(), TransactionStatus.PENDING),
-                TransactionStatus.SUCCESSED);
+                TransactionStatus.SUCCEEDED);
         assertThrows(InvalidTransitionException.class,
                 () -> TransactionStateMachine.transition(tx, TransactionStatus.PENDING));
     }
@@ -49,6 +49,6 @@ class TransactionStateMachineTest {
     @Test
     void canTransitionReturnsFalseForIllegal() {
         assertTrue(TransactionStateMachine.canTransition(TransactionStatus.CREATED, TransactionStatus.PENDING));
-        assertTrue(!TransactionStateMachine.canTransition(TransactionStatus.SUCCESSED, TransactionStatus.FAILED));
+        assertTrue(!TransactionStateMachine.canTransition(TransactionStatus.SUCCEEDED, TransactionStatus.FAILED));
     }
 }

@@ -21,6 +21,6 @@ public record TransactionRequest(
                 @NotNull @Schema(example = "550e8400-e29b-41d4-a716-446655440000") UUID walletId,
                 @NotNull @Positive @Schema(example = "1000.00") BigDecimal amount,
                 @NotNull @Schema(example = "STRIPE", allowableValues = { "WALLET", "STRIPE" }) PaymentMethod method,
-                @Schema(description = "URL HTTPS appelée lors des changements de statut (PENDING, SUCCESSED, FAILED, CANCELLED)", example = "https://merchant.example.com/webhooks/payment") String callbackUrl,
+                @Schema(description = "URL HTTPS appelée lors des changements de statut (PENDING, SUCCEEDED, FAILED, CANCELLED)", example = "https://merchant.example.com/webhooks/payment") String callbackUrl,
                 @Size(max = 20) @Schema(description = "Métadonnées opaques renvoyées dans les webhooks consommateur") Map<String, String> metadata) {
 }

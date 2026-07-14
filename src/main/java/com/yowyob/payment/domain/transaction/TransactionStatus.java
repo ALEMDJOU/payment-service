@@ -6,7 +6,7 @@ package com.yowyob.payment.domain.transaction;
 public enum TransactionStatus {
     CREATED,
     PENDING,
-    SUCCESSED,
+    SUCCEEDED,
     FAILED,
     CANCELLED
 }

@@ -16,8 +16,8 @@ public final class TransactionStateMachine {
             TransactionStatus.CREATED, EnumSet.of(
                     TransactionStatus.PENDING, TransactionStatus.FAILED),
             TransactionStatus.PENDING, EnumSet.of(
-                    TransactionStatus.SUCCESSED, TransactionStatus.FAILED, TransactionStatus.CANCELLED),
-            TransactionStatus.SUCCESSED, EnumSet.noneOf(TransactionStatus.class),
+                    TransactionStatus.SUCCEEDED, TransactionStatus.FAILED, TransactionStatus.CANCELLED),
+            TransactionStatus.SUCCEEDED, EnumSet.noneOf(TransactionStatus.class),
             TransactionStatus.FAILED, EnumSet.noneOf(TransactionStatus.class),
             TransactionStatus.CANCELLED, EnumSet.noneOf(TransactionStatus.class));
 

@@ -137,7 +137,7 @@ public class StripeController {
     }
 
     private Mono<Void> markSucceededFromMetadata(Event event) {
-        return transitionFromMetadata(event, TransactionStatus.SUCCESSED);
+        return transitionFromMetadata(event, TransactionStatus.SUCCEEDED);
     }
 
     private Mono<Void> markFailedFromMetadata(Event event) {
@@ -156,7 +156,7 @@ public class StripeController {
             return Mono.empty();
         }
         UUID txId = UUID.fromString(metadata.get("transaction_id"));
-        if (status == TransactionStatus.SUCCESSED) {
+        if (status == TransactionStatus.SUCCEEDED) {
             return transactionService.completeStripePayment(txId).then();
         }
         return transactionService.transitionStatus(txId, status).then();

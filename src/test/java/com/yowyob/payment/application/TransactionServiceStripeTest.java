@@ -140,7 +140,7 @@ class TransactionServiceStripeTest {
 
         StepVerifier.create(transactionService.completeStripePayment(pending.id()))
                 .assertNext(result -> {
-                    assertEquals(TransactionStatus.SUCCESSED, result.status());
+                    assertEquals(TransactionStatus.SUCCEEDED, result.status());
                     assertEquals(TransactionType.RECHARGE, result.type());
                 })
                 .verifyComplete();
@@ -148,12 +148,12 @@ class TransactionServiceStripeTest {
 
     @Test
     void completeStripePaymentShouldBeIdempotentWhenAlreadySucceeded() {
-        Transaction succeeded = sampleTransaction(TransactionStatus.SUCCESSED, TransactionType.PAYMENT,
+        Transaction succeeded = sampleTransaction(TransactionStatus.SUCCEEDED, TransactionType.PAYMENT,
                 PaymentMethod.STRIPE);
         when(transactionRepository.findById(succeeded.id())).thenReturn(Mono.just(succeeded));
 
         StepVerifier.create(transactionService.completeStripePayment(succeeded.id()))
-                .assertNext(result -> assertEquals(TransactionStatus.SUCCESSED, result.status()))
+                .assertNext(result -> assertEquals(TransactionStatus.SUCCEEDED, result.status()))
                 .verifyComplete();
     }
 

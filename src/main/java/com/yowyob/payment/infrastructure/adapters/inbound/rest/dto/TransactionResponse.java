@@ -23,7 +23,7 @@ public record TransactionResponse(
                 @Schema(description = "Type de transaction", example = "RECHARGE", allowableValues = {
                                 "RECHARGE", "PAYMENT" }) String type,
                 @Schema(description = "Statut FSM", example = "PENDING", allowableValues = { "CREATED", "PENDING",
-                                "SUCCESSED", "FAILED", "CANCELLED" }) String status,
+                                "SUCCEEDED", "FAILED", "CANCELLED" }) String status,
                 @Schema(description = "Référence métier unique", example = "YYPAY-1234567890") String reference,
                 @Schema(description = "Frais appliqués", example = "50.00") BigDecimal fees,
                 @Schema(description = "Méthode de paiement", example = "STRIPE", allowableValues = { "MOMO", "PAYPAL",

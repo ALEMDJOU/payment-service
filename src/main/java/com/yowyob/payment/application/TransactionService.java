@@ -94,8 +94,8 @@ public class TransactionService {
      */
     public Mono<TransactionCheckoutResult> recharge(UUID userId, UUID organizationId, UUID walletId,
             BigDecimal amount, PaymentMethod method, String callbackUrl, Map<String, String> metadata) {
-        validateAmount(amount);
-        return ensureSupportedRechargeMethod(method)
+        return validateAmount(amount)
+                .then(ensureSupportedRechargeMethod(method))
                 .then(Mono.defer(() -> walletService.authorizeAccess(walletId, userId, organizationId, false)))
                 .flatMap(wallet -> createTransaction(walletId, userId, organizationId, amount,
                         TransactionType.RECHARGE, method, BigDecimal.ZERO, callbackUrl, metadata)
@@ -117,7 +117,7 @@ public class TransactionService {
      */
     public Mono<TransactionCheckoutResult> walletPayment(UUID userId, UUID organizationId, UUID walletId,
             BigDecimal amount, PaymentMethod method, String callbackUrl, Map<String, String> metadata) {
-        validateAmount(amount);
+        return validateAmount(amount).then(Mono.defer(() -> {
         if (method != PaymentMethod.WALLET) {
             return Mono.error(new UnsupportedPaymentMethodException(method));
         }
@@ -139,7 +139,7 @@ public class TransactionService {
      */
     public Mono<TransactionCheckoutResult> directPayment(BigDecimal amount, PaymentMethod method, UUID userId,
             UUID organizationId, String callbackUrl, Map<String, String> metadata) {
-        validateAmount(amount);
+        return validateAmount(amount).then(Mono.defer(() -> {
         if (method != PaymentMethod.STRIPE) {
             return Mono.error(new UnsupportedPaymentMethodException(method));
         }
@@ -160,7 +160,7 @@ public class TransactionService {
         return transactionRepository.findById(txId)
                 .switchIfEmpty(Mono.error(new TransactionNotFoundException("Transaction introuvable: " + txId)))
                 .flatMap(tx -> {
-                    if (tx.status() == TransactionStatus.SUCCESSED) {
+                    if (tx.status() == TransactionStatus.SUCCEEDED) {
                         return Mono.just(tx);
                     }
                     if (tx.status() != TransactionStatus.PENDING) {
@@ -315,9 +315,9 @@ public class TransactionService {
         Transaction succeeded;
         if (tx.status() == TransactionStatus.CREATED) {
             Transaction pending = TransactionStateMachine.transition(tx, TransactionStatus.PENDING);
-            succeeded = TransactionStateMachine.transition(pending, TransactionStatus.SUCCESSED);
+            succeeded = TransactionStateMachine.transition(pending, TransactionStatus.SUCCEEDED);
         } else if (tx.status() == TransactionStatus.PENDING) {
-            succeeded = TransactionStateMachine.transition(tx, TransactionStatus.SUCCESSED);
+            succeeded = TransactionStateMachine.transition(tx, TransactionStatus.SUCCEEDED);
         } else {
             return Mono.error(new UserFriendlyException(
                     "Statut incompatible pour finalisation : " + tx.status()));
@@ -362,18 +362,19 @@ public class TransactionService {
     private ConsumerWebhookEventType consumerEventForStatus(TransactionStatus status) {
         return switch (status) {
             case PENDING -> ConsumerWebhookEventType.TRANSACTION_PENDING;
-            case SUCCESSED -> ConsumerWebhookEventType.TRANSACTION_SUCCEEDED;
+            case SUCCEEDED -> ConsumerWebhookEventType.TRANSACTION_SUCCEEDED;
             case FAILED -> ConsumerWebhookEventType.TRANSACTION_FAILED;
             case CANCELLED -> ConsumerWebhookEventType.TRANSACTION_CANCELLED;
             case CREATED -> null;
         };
     }
 
-    private void validateAmount(BigDecimal amount) {
+    private Mono<Void> validateAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(minAmount) < 0 || amount.compareTo(maxAmount) > 0) {
-            throw new UserFriendlyException(
-                    "Montant invalide : doit être compris entre " + minAmount + " et " + maxAmount);
+            return Mono.error(new UserFriendlyException(
+                    "Montant invalide : doit être compris entre " + minAmount + " et " + maxAmount));
         }
+        return Mono.empty();
     }
 
     private Mono<Void> ensureSupportedRechargeMethod(PaymentMethod method) {
